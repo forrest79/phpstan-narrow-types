@@ -1,0 +1,14 @@
+includes:
+	- %rootDir%/conf/bleedingEdge.neon
+	- %rootDir%/../phpstan-strict-rules/rules.neon
+
+	# Settings for tests
+	- extension.neon
+
+parameters:
+	level: max
+	ignoreErrors:
+		-
+			message: '#^Call to static method Forrest79\\NarrowTypes::isType\(\) with mixed and string will always evaluate to true\.$#'
+			path: %rootDir%/../../../src/functions.php
+			count: 1

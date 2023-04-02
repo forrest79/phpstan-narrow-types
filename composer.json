@@ -1,0 +1,44 @@
+{
+	"name": "forrest79/phpstan-narrow-types",
+	"description": "PHPStanNarrowTypes provides functionality to narrow complex array/list types with assert.",
+	"keywords": ["phpstan", "narrow", "type", "array", "list"],
+	"type": "phpstan-extension",
+	"license": "BSD-3-Clause",
+	"authors": [
+		{
+			"name": "Jakub Trmota",
+			"email": "jakub@trmota.cz"
+		}
+	],
+	"require": {
+		"php": "^8.1",
+		"phpstan/phpstan": "^1.10",
+		"nikic/php-parser": "^4.15"
+ 	},
+	"require-dev": {
+		"forrest79/phpcs": "^1.1",
+		"forrest79/phpcs-ignores": "^0.3.0",
+		"phpstan/phpstan-strict-rules": "^1.5"
+	},
+	"autoload": {
+		"psr-4": {
+			"Forrest79\\": "src"
+		},
+		"files": ["src/functions.php"]
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"Forrest79\\PHPStanNarrowTypes\\Tests\\": "tests/"
+		}
+	},
+	"scripts": {
+		"phpcs": "vendor/bin/phpcs --bootstrap=vendor/forrest79/phpcs-ignores/src/bootstrap.php -s src tests",
+		"phpstan": "vendor/bin/phpstan analyse src tests",
+		"tests": "php tests/run-tests.php"
+	},
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": false
+		}
+	}
+}

@@ -1,0 +1,10 @@
+services:
+	Forrest79PHPStanTypeNarrowTypesFunctionTypeSpecifyingExtension:
+		class: Forrest79\PHPStan\Type\NarrowTypesFunctionTypeSpecifyingExtension
+		tags:
+			- phpstan.typeSpecifier.functionTypeSpecifyingExtension
+
+	Forrest79PHPStanTypeNarrowTypesNarrowTypesStaticMethodReturnTypeExtension:
+		class: Forrest79\PHPStan\Type\NarrowTypesStaticMethodReturnTypeExtension
+		tags:
+			- phpstan.typeSpecifier.staticMethodTypeSpecifyingExtension

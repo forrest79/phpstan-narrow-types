@@ -1,0 +1,12 @@
+ignoreErrors:
+	-
+		sniff: SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
+		message: Unused parameter $context.
+		count: 2
+		path: src/PHPStan/Type/NarrowTypesFunctionTypeSpecifyingExtension.php
+
+	-
+		sniff: SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
+		message: Unused parameter $context.
+		count: 2
+		path: src/PHPStan/Type/NarrowTypesStaticMethodReturnTypeExtension.php
