@@ -23,9 +23,9 @@ final class Tests
 		self::classIsListObject([new \DateTimeImmutable()]);
 		self::functionIsListObject([new \DateTimeImmutable()]);
 
-		// list<NarrowTypes\Helper>
-		self::classIsListFqnObject([new NarrowTypes\Helper()]);
-		self::functionIsListFqnObject([new NarrowTypes\Helper()]);
+		// list<NarrowTypes\FullyQualifiedClassNameResolver>
+		self::classIsListFqnObject([new NarrowTypes\FullyQualifiedClassNameResolver()]);
+		self::functionIsListFqnObject([new NarrowTypes\FullyQualifiedClassNameResolver()]);
 
 		// list<int|string>
 		self::classIsListIntString([1, 'test', 3]);
@@ -35,11 +35,25 @@ final class Tests
 		self::classIsListArray([[1 => 1.1], [2 => 1.2]]);
 		self::functionIsListArray([[1 => 1.1], [2 => 1.2]]);
 
+		// list<string>|list<NULL>
+		self::classIsListStringOrListNull(['a', 'b']);
+		self::functionIsListStringOrListNull(['a', 'b']);
+
+		// list<string>|list<NULL>
+		self::classIsListStringOrListNull([NULL, NULL]);
+		self::functionIsListStringOrListNull([NULL, NULL]);
+
 		// Arrays
 
 		// array<int, string|bool>
 		self::classIsArrayIntStringBool([1 => 'A', 2 => TRUE, 3 => 'C']);
 		self::aunctionIsArrayIntStringBool([1 => 'A', 2 => TRUE, 3 => 'C']);
+
+		// array<int, string|bool>|NULL
+		self::classIsArrayIntStringBoolNullable([1 => 'A', 2 => TRUE, 3 => 'C']);
+		self::aunctionIsArrayIntStringBoolNullable([1 => 'A', 2 => TRUE, 3 => 'C']);
+		self::classIsArrayIntStringBoolNullable(NULL);
+		self::aunctionIsArrayIntStringBoolNullable(NULL);
 	}
 
 
@@ -114,20 +128,20 @@ final class Tests
 
 	private static function classIsListFqnObject(mixed $objectList): void
 	{
-		assert(NarrowTypes::isType($objectList, 'list<NarrowTypes\Helper>'));
+		assert(NarrowTypes::isType($objectList, 'list<NarrowTypes\FullyQualifiedClassNameResolver>'));
 		self::arrayIsListFqnObjectType($objectList);
 	}
 
 
 	private static function functionIsListFqnObject(mixed $objectList): void
 	{
-		assert(is_type($objectList, 'list<NarrowTypes\Helper>'));
+		assert(is_type($objectList, 'list<NarrowTypes\FullyQualifiedClassNameResolver>'));
 		self::arrayIsListFqnObjectType($objectList);
 	}
 
 
 	/**
-	 * @param list<NarrowTypes\Helper> $objectList
+	 * @param list<NarrowTypes\FullyQualifiedClassNameResolver> $objectList
 	 */
 	private static function arrayIsListFqnObjectType(array $objectList): void
 	{
@@ -181,6 +195,29 @@ final class Tests
 	}
 
 
+	private static function classIsListStringOrListNull(mixed $arrayList): void
+	{
+		assert(NarrowTypes::isType($arrayList, 'list<string>|list<NULL>'));
+		self::arrayIsListStringOrListNull($arrayList);
+	}
+
+
+	private static function functionIsListStringOrListNull(mixed $arrayList): void
+	{
+		assert(is_type($arrayList, 'list<string>|list<NULL>'));
+		self::arrayIsListStringOrListNull($arrayList);
+	}
+
+
+	/**
+	 * @param list<string>|list<NULL> $arrayList
+	 */
+	private static function arrayIsListStringOrListNull(array $arrayList): void
+	{
+		var_dump($arrayList);
+	}
+
+
 	private static function classIsArrayIntStringBool(mixed $arrayIntStringBool): void
 	{
 		assert(NarrowTypes::isType($arrayIntStringBool, 'array<int, string|bool>'));
@@ -201,6 +238,29 @@ final class Tests
 	private static function arrayIsArrayIntStringBoolType(array $arrayIntStringBool): void
 	{
 		var_dump($arrayIntStringBool);
+	}
+
+
+	private static function classIsArrayIntStringBoolNullable(mixed $arrayIntStringBoolNullable): void
+	{
+		assert(NarrowTypes::isType($arrayIntStringBoolNullable, 'array<int, string|bool>|NULL'));
+		self::arrayIsArrayIntStringBoolTypeNullable($arrayIntStringBoolNullable);
+	}
+
+
+	private static function aunctionIsArrayIntStringBoolNullable(mixed $arrayIntStringBoolNullable): void
+	{
+		assert(is_type($arrayIntStringBoolNullable, 'array<int, string|bool>|NULL'));
+		self::arrayIsArrayIntStringBoolTypeNullable($arrayIntStringBoolNullable);
+	}
+
+
+	/**
+	 * @param array<int, string|bool>|NULL $arrayIntStringBoolNullable
+	 */
+	private static function arrayIsArrayIntStringBoolTypeNullable(array|NULL $arrayIntStringBoolNullable): void
+	{
+		var_dump($arrayIntStringBoolNullable);
 	}
 
 }

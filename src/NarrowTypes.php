@@ -2,7 +2,7 @@
 
 namespace Forrest79;
 
-use Forrest79\NarrowTypes\Helper;
+use Forrest79\NarrowTypes\TypeParser;
 use PHPStan\ShouldNotHappenException;
 
 /**
@@ -11,13 +11,13 @@ use PHPStan\ShouldNotHappenException;
 final class NarrowTypes
 {
 	private const HAS_IS_FUNCTION_TYPES = [
-		Helper::NULL,
-		Helper::INT,
-		Helper::FLOAT,
-		Helper::STRING,
-		Helper::BOOL,
-		Helper::CALLABLE,
-		Helper::OBJECT,
+		TypeParser::NULL,
+		TypeParser::INT,
+		TypeParser::FLOAT,
+		TypeParser::STRING,
+		TypeParser::BOOL,
+		TypeParser::CALLABLE,
+		TypeParser::OBJECT,
 	];
 
 
@@ -37,44 +37,44 @@ final class NarrowTypes
 
 	private static function checkType(string $filename, mixed $value, string $type): bool
 	{
-		foreach (Helper::parseType($filename, $type) as $parsedType) {
+		foreach (TypeParser::parse($filename, $type) as $parsedType) {
 			$checkType = $parsedType['type'];
 
-			if ($checkType === Helper::MIXED) {
+			if ($checkType === TypeParser::MIXED) {
 				return TRUE;
 			} else if (in_array($checkType, self::HAS_IS_FUNCTION_TYPES, TRUE)) {
 				if (call_user_func('is_' . $checkType, $value) === TRUE) {
 					return TRUE;
 				}
-			} else if ($checkType === Helper::ARRAY) {
+			} else if ($checkType === TypeParser::ARRAY) {
 				if (is_array($value)) {
 					if (isset($parsedType['key']) && isset($parsedType['value'])) {
 						foreach ($value as $k => $v) {
 							if (!self::checkType($filename, $k, $parsedType['key']) || !self::checkType($filename, $v, $parsedType['value'])) {
-								return FALSE;
+								continue 2;
 							}
 						}
 					}
 
 					return TRUE;
 				}
-			} else if ($checkType === Helper::LIST) {
+			} else if ($checkType === TypeParser::LIST) {
 				if (is_array($value) && array_is_list($value)) {
 					if (isset($parsedType['value'])) {
 						foreach ($value as $v) {
 							if (!self::checkType($filename, $v, $parsedType['value'])) {
-								return FALSE;
+								continue 2;
 							}
 						}
 					}
 
 					return TRUE;
 				}
-			} else if ($checkType === Helper::OBJECT) {
+			} else if ($checkType === TypeParser::OBJECT) {
 				if (is_object($value)) {
 					if (isset($parsedType['class'])) {
 						if (!($value instanceof $parsedType['class'])) {
-							return FALSE;
+							continue;
 						}
 					}
 
