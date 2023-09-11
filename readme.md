@@ -3,7 +3,7 @@
 [![Latest Stable Version](https://poser.pugx.org/forrest79/phpstan-narrow-types/v)](//packagist.org/packages/forrest79/phpstan-narrow-types)
 [![Monthly Downloads](https://poser.pugx.org/forrest79/phpstan-narrow-types/d/monthly)](//packagist.org/packages/forrest79/phpstan-narrow-types)
 [![License](https://poser.pugx.org/forrest79/phpstan-narrow-types/license)](//packagist.org/packages/forrest79/phpstan-narrow-types)
-[![Build](https://github.com/forrest79/PHPStanNarrowTypes/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/forrest79/PHPStanNarrowTypes/actions/workflows/build.yml)
+[![Build](https://github.com/forrest79/phpstan-narrow-types/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/forrest79/phpstan-narrow-types/actions/workflows/build.yml)
 
 ## Introduction
 

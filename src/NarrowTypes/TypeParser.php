@@ -105,7 +105,7 @@ final class TypeParser
 				} else {
 					$parsedType = [
 						'type' => self::OBJECT,
-						'class' => \str_starts_with($part, '\\')
+						'class' => str_starts_with($part, '\\')
 							? $part
 							: FullyQualifiedClassNameResolver::resolve($this->filename, $part),
 					];

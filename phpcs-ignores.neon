@@ -10,3 +10,9 @@ ignoreErrors:
 		message: Unused parameter $context.
 		count: 2
 		path: src/PHPStan/Type/NarrowTypesStaticMethodReturnTypeExtension.php
+
+	-
+		sniff: Generic.PHP.ForbiddenFunctions.Found
+		message: 'The use of function var_dump() is forbidden'
+		count: 9
+		path: tests/Tests.php
