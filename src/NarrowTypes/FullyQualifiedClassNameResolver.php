@@ -34,7 +34,10 @@ final class FullyQualifiedClassNameResolver
 			return NULL;
 		}
 
-		$parser = (new PhpParser\ParserFactory())->create(PhpParser\ParserFactory::PREFER_PHP7);
+		$parserFactory = new PhpParser\ParserFactory();
+		$parser = method_exists($parserFactory, 'createForVersion')
+			? (new PhpParser\ParserFactory())->createForVersion(PhpParser\PhpVersion::fromComponents(8, 1)) // v5
+			: (new PhpParser\ParserFactory())->create(PhpParser\ParserFactory::PREFER_PHP7); // compatibility for Nikic\PhpParser shipped with PhpStan (v4)
 		$traverser = new PhpParser\NodeTraverser();
 		$nameResolver = new PhpParser\NodeVisitor\NameResolver();
 		$traverser->addVisitor($nameResolver);

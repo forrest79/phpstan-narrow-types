@@ -13,7 +13,7 @@
 	"require": {
 		"php": "^8.1",
 		"phpstan/phpstan": "^1.10",
-		"nikic/php-parser": "^4.17"
+		"nikic/php-parser": "^5.0"
  	},
 	"require-dev": {
 		"forrest79/phpcs": "^1.5",
@@ -33,7 +33,7 @@
 	},
 	"scripts": {
 		"phpcs": "vendor/bin/phpcs --bootstrap=vendor/forrest79/phpcs-ignores/src/bootstrap.php -s src tests",
-		"phpstan": "vendor/bin/phpstan analyse src tests",
+		"phpstan": "vendor/bin/phpstan analyse src tests -v",
 		"tests": "php tests/run-tests.php"
 	},
 	"config": {

@@ -12,3 +12,16 @@ parameters:
 			message: '#^Call to static method Forrest79\\NarrowTypes::isType\(\) with mixed and string will always evaluate to true\.$#'
 			path: %rootDir%/../../../src/functions.php
 			count: 1
+		# temp version mismatch for Nikic\PhpParser v4 (shipped with PHPStan) vs v5
+		-
+			message: "#^Call to function method_exists\\(\\) with PhpParser\\\\ParserFactory and 'createForVersion' will always evaluate to true\\.$#"
+			path: %rootDir%/../../../src/NarrowTypes/FullyQualifiedClassNameResolver.php
+			count: 1
+		-
+			message: '#^Access to undefined constant PhpParser\\ParserFactory::PREFER_PHP7\.$#'
+			path: %rootDir%/../../../src/NarrowTypes/FullyQualifiedClassNameResolver.php
+			count: 1
+		-
+			message: '#^Call to an undefined method PhpParser\\ParserFactory::create\(\)\.$#'
+			path: %rootDir%/../../../src/NarrowTypes/FullyQualifiedClassNameResolver.php
+			count: 1
