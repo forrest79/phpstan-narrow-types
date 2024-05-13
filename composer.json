@@ -12,13 +12,13 @@
 	],
 	"require": {
 		"php": "^8.1",
-		"phpstan/phpstan": "^1.10",
+		"phpstan/phpstan": "^1.11",
 		"nikic/php-parser": "^5.0"
  	},
 	"require-dev": {
 		"forrest79/phpcs": "^1.5",
-		"forrest79/phpcs-ignores": "^0.4",
-		"phpstan/phpstan-strict-rules": "^1.5"
+		"forrest79/phpcs-ignores": "^0.5",
+		"phpstan/phpstan-strict-rules": "^1.6"
 	},
 	"autoload": {
 		"psr-4": {
