@@ -48,7 +48,7 @@ abstract class NarrowTypesReturnTypeExtension implements Analyser\TypeSpecifierA
 			throw new ShouldNotHappenException(sprintf('Unsupported method/function \'%s\' in %s.', $methodOrFunctionName, static::class));
 		}
 
-		return $this->typeSpecifier->create($args[0]->value, $type, Analyser\TypeSpecifierContext::createTruthy());
+		return $this->typeSpecifier->create($args[0]->value, $type, Analyser\TypeSpecifierContext::createTruthy(), $scope);
 	}
 
 
@@ -80,9 +80,15 @@ abstract class NarrowTypesReturnTypeExtension implements Analyser\TypeSpecifierA
 				}
 			} else if ($checkType === TypeParser::LIST) {
 				if (isset($parsedType['value'])) {
-					$narrowType[] = Type\Accessory\AccessoryArrayListType::intersectWith(new Type\ArrayType(new Type\IntegerType(), self::narrowType($filename, $parsedType['value'])));
+					$narrowType[] = Type\TypeCombinator::intersect(
+						new Type\ArrayType(new Type\IntegerType(), self::narrowType($filename, $parsedType['value'])),
+						new Type\Accessory\AccessoryArrayListType(),
+					);
 				} else {
-					$narrowType[] = Type\Accessory\AccessoryArrayListType::intersectWith(new Type\ArrayType(new Type\IntegerType(), new Type\MixedType()));
+					$narrowType[] = Type\TypeCombinator::intersect(
+						new Type\ArrayType(new Type\IntegerType(), new Type\MixedType()),
+						new Type\Accessory\AccessoryArrayListType(),
+					);
 				}
 			} else if ($checkType === TypeParser::OBJECT) {
 				if (isset($parsedType['class'])) {

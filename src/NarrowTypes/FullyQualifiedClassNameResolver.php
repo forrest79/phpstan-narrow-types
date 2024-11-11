@@ -43,6 +43,8 @@ final class FullyQualifiedClassNameResolver
 		$traverser->addVisitor($nameResolver);
 		$nameContext = $nameResolver->getNameContext();
 
+		assert($parser instanceof PhpParser\Parser);
+
 		try {
 			$code = file_get_contents($filename);
 			if ($code === FALSE) {
