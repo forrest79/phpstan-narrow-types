@@ -7,7 +7,7 @@ use Closure;
 use Generator;
 use Iterator;
 use IteratorAggregate;
-use _PHPStan_f1e88529a\Nette\Utils\Strings;
+use _PHPStan_d71ee8f80\Nette\Utils\Strings;
 use PhpParser\Node\Name;
 use PHPStan\Analyser\ConstantResolver;
 use PHPStan\Analyser\NameScope;
@@ -59,6 +59,7 @@ use PHPStan\Type\ArrayType;
 use PHPStan\Type\BenevolentUnionType;
 use PHPStan\Type\BooleanType;
 use PHPStan\Type\CallableType;
+use PHPStan\Type\ClassConstantAccessType;
 use PHPStan\Type\ClassStringType;
 use PHPStan\Type\ClosureType;
 use PHPStan\Type\ConditionalType;
@@ -356,8 +357,9 @@ final class TypeNodeResolver
                 case 'parent':
                     if ($this->getReflectionProvider()->hasClass($nameScope->getClassName())) {
                         $classReflection = $this->getReflectionProvider()->getClass($nameScope->getClassName());
-                        if ($classReflection->getParentClass() !== null) {
-                            return new ObjectType($classReflection->getParentClass()->getName());
+                        $parentClass = $classReflection->getNativeReflection()->getParentClass();
+                        if ($parentClass !== \false) {
+                            return new ObjectType($parentClass->getName());
                         }
                     }
                     return new NonexistentParentClassType();
@@ -470,7 +472,11 @@ final class TypeNodeResolver
     private function resolveIntersectionTypeNode(IntersectionTypeNode $typeNode, NameScope $nameScope): Type
     {
         $types = $this->resolveMultiple($typeNode->types, $nameScope);
-        return TypeCombinator::intersect(...$types);
+        $result = $types[0];
+        for ($i = 1, $count = count($types); $i < $count; $i++) {
+            $result = TypeCombinator::intersect($result, $types[$i]);
+        }
+        return $result;
     }
     private function resolveConditionalTypeNode(ConditionalTypeNode $typeNode, NameScope $nameScope): Type
     {
@@ -792,9 +798,13 @@ final class TypeNodeResolver
                 throw new ShouldNotHappenException();
                 // global constant should get parsed as class name in IdentifierTypeNode
             }
+            $isStatic = \false;
             if ($nameScope->getClassName() !== null) {
                 switch (strtolower($constExpr->className)) {
                     case 'static':
+                        $className = $nameScope->getClassName();
+                        $isStatic = \true;
+                        break;
                     case 'self':
                         $className = $nameScope->getClassName();
                         break;
@@ -816,9 +826,15 @@ final class TypeNodeResolver
                 return new ErrorType();
             }
             $classReflection = $this->getReflectionProvider()->getClass($className);
+            if ($isStatic && $classReflection->isFinal()) {
+                $isStatic = \false;
+            }
             $constantName = $constExpr->name;
             if (!$classReflection->hasConstant($constantName)) {
                 return new ErrorType();
+            }
+            if ($isStatic) {
+                return new ClassConstantAccessType(new StaticType($classReflection), $constantName);
             }
             $reflectionConstant = $classReflection->getNativeReflection()->getReflectionConstant($constantName);
             if ($reflectionConstant === \false) {
@@ -864,9 +880,13 @@ final class TypeNodeResolver
                 throw new ShouldNotHappenException();
                 // global constant should get parsed as class name in IdentifierTypeNode
             }
+            $isStatic = \false;
             if ($nameScope->getClassName() !== null) {
                 switch (strtolower($constExpr->className)) {
                     case 'static':
+                        $className = $nameScope->getClassName();
+                        $isStatic = \true;
+                        break;
                     case 'self':
                         $className = $nameScope->getClassName();
                         break;
@@ -888,6 +908,9 @@ final class TypeNodeResolver
                 return new ErrorType();
             }
             $classReflection = $this->getReflectionProvider()->getClass($className);
+            if ($isStatic && $classReflection->isFinal()) {
+                $isStatic = \false;
+            }
             $constantName = $constExpr->name;
             if (Strings::contains($constantName, '*')) {
                 // convert * into .*? and escape everything else so the constants can be matched against the pattern
@@ -918,6 +941,9 @@ final class TypeNodeResolver
             }
             if ($classReflection->isEnum() && $classReflection->hasEnumCase($constantName)) {
                 return new EnumCaseObjectType($classReflection->getName(), $constantName);
+            }
+            if ($isStatic) {
+                return new ClassConstantAccessType(new StaticType($classReflection), $constantName);
             }
             $reflectionConstant = $classReflection->getNativeReflection()->getReflectionConstant($constantName);
             if ($reflectionConstant === \false) {
