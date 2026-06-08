@@ -91,8 +91,56 @@ parameters:
 			path: tests/RuntimeTest.php
 
 		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''+1'' and ''decimal-int-string'' will always evaluate to false.'
+			identifier: staticMethod.impossibleType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''+1'' and ''non-decimal-int…'' will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''-1'' and ''decimal-int-string'' will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''-1'' and ''non-decimal-int…'' will always evaluate to false.'
+			identifier: staticMethod.impossibleType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''0'' and ''decimal-int-string'' will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''0'' and ''non-decimal-int…'' will always evaluate to false.'
+			identifier: staticMethod.impossibleType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
 			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''0'' and ''truthy-string'' will always evaluate to false.'
 			identifier: staticMethod.impossibleType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''00'' and ''decimal-int-string'' will always evaluate to false.'
+			identifier: staticMethod.impossibleType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''00'' and ''non-decimal-int…'' will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/RuntimeTest.php
 
@@ -103,8 +151,32 @@ parameters:
 			path: tests/RuntimeTest.php
 
 		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''1.2'' and ''decimal-int-string'' will always evaluate to false.'
+			identifier: staticMethod.impossibleType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''1.2'' and ''non-decimal-int…'' will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
 			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''1.8'' and ''numeric-string'' will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''123'' and ''decimal-int-string'' will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''123'' and ''non-decimal-int…'' will always evaluate to false.'
+			identifier: staticMethod.impossibleType
 			count: 1
 			path: tests/RuntimeTest.php
 
@@ -327,6 +399,18 @@ parameters:
 		-
 			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''d'' and ''non-empty-uppercase…'' will always evaluate to false.'
 			identifier: staticMethod.impossibleType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''foo'' and ''decimal-int-string'' will always evaluate to false.'
+			identifier: staticMethod.impossibleType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with ''foo'' and ''non-decimal-int…'' will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/RuntimeTest.php
 
@@ -963,6 +1047,18 @@ parameters:
 		-
 			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with array{foo: 1, bar: ''test''} and ''array{foo: int, bar…'' will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with array{foo: 1, bar: 2} and ''array{foo: int, ...}'' will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/RuntimeTest.php
+
+		-
+			rawMessage: 'Call to static method Forrest79\TypeValidator::isType() with array{foo: 1, bar: 2} and ''array{foo: int}'' will always evaluate to false.'
+			identifier: staticMethod.impossibleType
 			count: 1
 			path: tests/RuntimeTest.php
 

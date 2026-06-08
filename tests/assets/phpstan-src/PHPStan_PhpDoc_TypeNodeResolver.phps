@@ -7,11 +7,13 @@ use Closure;
 use Generator;
 use Iterator;
 use IteratorAggregate;
-use _PHPStan_d71ee8f80\Nette\Utils\Strings;
+use _PHPStan_2874a496b\Nette\Utils\Strings;
 use PhpParser\Node\Name;
 use PHPStan\Analyser\ConstantResolver;
 use PHPStan\Analyser\NameScope;
+use PHPStan\DependencyInjection\AutowiredParameter;
 use PHPStan\DependencyInjection\AutowiredService;
+use PHPStan\DependencyInjection\ReportUnsafeArrayStringKeyCastingToggle;
 use PHPStan\PhpDoc\Tag\TemplateTag;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprArrayNode;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprFalseNode;
@@ -48,6 +50,7 @@ use PHPStan\Reflection\ReflectionProvider;
 use PHPStan\ShouldNotHappenException;
 use PHPStan\TrinaryLogic;
 use PHPStan\Type\Accessory\AccessoryArrayListType;
+use PHPStan\Type\Accessory\AccessoryDecimalIntegerStringType;
 use PHPStan\Type\Accessory\AccessoryLiteralStringType;
 use PHPStan\Type\Accessory\AccessoryLowercaseStringType;
 use PHPStan\Type\Accessory\AccessoryNonEmptyStringType;
@@ -107,6 +110,7 @@ use PHPStan\Type\Type;
 use PHPStan\Type\TypeAliasResolver;
 use PHPStan\Type\TypeAliasResolverProvider;
 use PHPStan\Type\TypeCombinator;
+use PHPStan\Type\TypeTraverser;
 use PHPStan\Type\TypeUtils;
 use PHPStan\Type\UnionType;
 use PHPStan\Type\ValueOfType;
@@ -128,6 +132,9 @@ use function str_replace;
 use function str_starts_with;
 use function strtolower;
 use function substr;
+/**
+ * @phpstan-import-type Level from ReportUnsafeArrayStringKeyCastingToggle as ReportUnsafeArrayStringKeyCastingLevel
+ */
 #[AutowiredService]
 final class TypeNodeResolver
 {
@@ -136,15 +143,31 @@ final class TypeNodeResolver
     private TypeAliasResolverProvider $typeAliasResolverProvider;
     private ConstantResolver $constantResolver;
     private InitializerExprTypeResolver $initializerExprTypeResolver;
+    /**
+     * @var ReportUnsafeArrayStringKeyCastingLevel
+     */
+    private ?string $reportUnsafeArrayStringKeyCasting;
     /** @var array<string, true> */
     private array $genericTypeResolvingStack = [];
-    public function __construct(\PHPStan\PhpDoc\TypeNodeResolverExtensionRegistryProvider $extensionRegistryProvider, ReflectionProvider\ReflectionProviderProvider $reflectionProviderProvider, TypeAliasResolverProvider $typeAliasResolverProvider, ConstantResolver $constantResolver, InitializerExprTypeResolver $initializerExprTypeResolver)
+    /**
+     * @param ReportUnsafeArrayStringKeyCastingLevel $reportUnsafeArrayStringKeyCasting
+     */
+    public function __construct(
+        \PHPStan\PhpDoc\TypeNodeResolverExtensionRegistryProvider $extensionRegistryProvider,
+        ReflectionProvider\ReflectionProviderProvider $reflectionProviderProvider,
+        TypeAliasResolverProvider $typeAliasResolverProvider,
+        ConstantResolver $constantResolver,
+        InitializerExprTypeResolver $initializerExprTypeResolver,
+        #[AutowiredParameter]
+        ?string $reportUnsafeArrayStringKeyCasting
+    )
     {
         $this->extensionRegistryProvider = $extensionRegistryProvider;
         $this->reflectionProviderProvider = $reflectionProviderProvider;
         $this->typeAliasResolverProvider = $typeAliasResolverProvider;
         $this->constantResolver = $constantResolver;
         $this->initializerExprTypeResolver = $initializerExprTypeResolver;
+        $this->reportUnsafeArrayStringKeyCasting = $reportUnsafeArrayStringKeyCasting;
     }
     /** @api */
     public function resolve(TypeNode $typeNode, NameScope $nameScope): Type
@@ -211,6 +234,10 @@ final class TypeNodeResolver
                 return new UnionType([IntegerRangeType::fromInterval(null, -1), IntegerRangeType::fromInterval(1, null)]);
             case 'string':
                 return new StringType();
+            case 'decimal-int-string':
+                return new IntersectionType([new StringType(), new AccessoryDecimalIntegerStringType()]);
+            case 'non-decimal-int-string':
+                return new IntersectionType([new StringType(), new AccessoryDecimalIntegerStringType(\true)]);
             case 'lowercase-string':
                 return new IntersectionType([new StringType(), new AccessoryLowercaseStringType()]);
             case 'uppercase-string':
@@ -489,7 +516,7 @@ final class TypeNodeResolver
     private function resolveArrayTypeNode(ArrayTypeNode $typeNode, NameScope $nameScope): Type
     {
         $itemType = $this->resolve($typeNode->type, $nameScope);
-        return new ArrayType(new BenevolentUnionType([new IntegerType(), new StringType()]), $itemType);
+        return new ArrayType((new BenevolentUnionType([new IntegerType(), new StringType()]))->toArrayKey(), $itemType);
     }
     private function resolveGenericTypeNode(GenericTypeNode $typeNode, NameScope $nameScope): Type
     {
@@ -510,10 +537,10 @@ final class TypeNodeResolver
         if (in_array($mainTypeName, ['array', 'non-empty-array'], \true)) {
             if (count($genericTypes) === 1) {
                 // array<ValueType>
-                $arrayType = new ArrayType(new BenevolentUnionType([new IntegerType(), new StringType()]), $genericTypes[0]);
+                $arrayType = new ArrayType((new BenevolentUnionType([new IntegerType(), new StringType()]))->toArrayKey(), $genericTypes[0]);
             } elseif (count($genericTypes) === 2) {
                 // array<KeyType, ValueType>
-                $keyType = TypeCombinator::intersect($genericTypes[0]->toArrayKey(), new UnionType([new IntegerType(), new StringType()]))->toArrayKey();
+                $keyType = $this->transformUnsafeArrayKey($genericTypes[0]);
                 $finiteTypes = $keyType->getFiniteTypes();
                 if (count($finiteTypes) === 1 && ($finiteTypes[0] instanceof ConstantStringType || $finiteTypes[0] instanceof ConstantIntegerType)) {
                     $arrayBuilder = ConstantArrayTypeBuilder::createEmpty();
@@ -719,6 +746,23 @@ final class TypeNodeResolver
         }
         return new ErrorType();
     }
+    private function transformUnsafeArrayKey(Type $keyType): Type
+    {
+        if ($this->reportUnsafeArrayStringKeyCasting === ReportUnsafeArrayStringKeyCastingToggle::PREVENT) {
+            if (!$keyType->isSuperTypeOf(new IntegerType())->yes()) {
+                $keyType = TypeTraverser::map($keyType, static function (Type $type, callable $traverse) {
+                    if ($type instanceof UnionType || $type instanceof IntersectionType) {
+                        return $traverse($type);
+                    }
+                    if ($type instanceof StringType) {
+                        return TypeCombinator::intersect($type, new AccessoryDecimalIntegerStringType(\true));
+                    }
+                    return $type;
+                });
+            }
+        }
+        return TypeCombinator::intersect($keyType->toArrayKey(), new UnionType([new IntegerType(), new StringType()]))->toArrayKey();
+    }
     private function resolveCallableTypeNode(CallableTypeNode $typeNode, NameScope $nameScope): Type
     {
         $templateTags = [];
@@ -764,16 +808,55 @@ final class TypeNodeResolver
     {
         $builder = ConstantArrayTypeBuilder::createEmpty();
         $builder->disableArrayDegradation();
+        $explicitKeyValues = [];
         foreach ($typeNode->items as $itemNode) {
             if ($itemNode->valueType instanceof CallableTypeNode) {
                 $builder->disableClosureDegradation();
             }
             $offsetType = $this->resolveArrayShapeOffsetType($itemNode, $nameScope);
+            if ($offsetType instanceof ConstantIntegerType || $offsetType instanceof ConstantStringType) {
+                $explicitKeyValues[] = $offsetType->getValue();
+            }
             $builder->setOffsetValueType($offsetType, $this->resolve($itemNode->valueType, $nameScope), $itemNode->optional);
+        }
+        $isList = in_array($typeNode->kind, [ArrayShapeNode::KIND_LIST, ArrayShapeNode::KIND_NON_EMPTY_LIST], \true);
+        if (!$typeNode->sealed) {
+            if ($typeNode->unsealedType === null) {
+                if ($isList) {
+                    $unsealedKeyType = IntegerRangeType::createAllGreaterThanOrEqualTo(0);
+                } else {
+                    $unsealedKeyType = (new BenevolentUnionType([new IntegerType(), new StringType()]))->toArrayKey();
+                }
+                $builder->makeUnsealed($unsealedKeyType, new MixedType());
+            } else {
+                if ($typeNode->unsealedType->keyType === null) {
+                    if ($isList) {
+                        $unsealedKeyType = IntegerRangeType::createAllGreaterThanOrEqualTo(0);
+                    } else {
+                        $unsealedKeyType = (new BenevolentUnionType([new IntegerType(), new StringType()]))->toArrayKey();
+                    }
+                } else {
+                    $unsealedKeyType = $this->transformUnsafeArrayKey($this->resolve($typeNode->unsealedType->keyType, $nameScope));
+                }
+                $unsealedKeyFiniteTypes = $unsealedKeyType->getFiniteTypes();
+                $unsealedValueType = $this->resolve($typeNode->unsealedType->valueType, $nameScope);
+                if (count($unsealedKeyFiniteTypes) > 0) {
+                    foreach ($unsealedKeyFiniteTypes as $unsealedKeyFiniteType) {
+                        // Explicit keys own their slot — the unsealed extras
+                        // describe entries at keys NOT in the explicit set.
+                        if (($unsealedKeyFiniteType instanceof ConstantIntegerType || $unsealedKeyFiniteType instanceof ConstantStringType) && in_array($unsealedKeyFiniteType->getValue(), $explicitKeyValues, \true)) {
+                            continue;
+                        }
+                        $builder->setOffsetValueType($unsealedKeyFiniteType, $unsealedValueType, \true);
+                    }
+                } else {
+                    $builder->makeUnsealed($unsealedKeyType, $unsealedValueType);
+                }
+            }
         }
         $arrayType = $builder->getArray();
         $accessories = [];
-        if (in_array($typeNode->kind, [ArrayShapeNode::KIND_LIST, ArrayShapeNode::KIND_NON_EMPTY_LIST], \true)) {
+        if ($isList) {
             $accessories[] = new AccessoryArrayListType();
         }
         if (in_array($typeNode->kind, [ArrayShapeNode::KIND_NON_EMPTY_ARRAY, ArrayShapeNode::KIND_NON_EMPTY_LIST], \true)) {

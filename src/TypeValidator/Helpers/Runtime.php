@@ -73,6 +73,8 @@ class Runtime
 				'non-positive-int' => is_int($value) && $value <= 0,
 				'non-negative-int' => is_int($value) && $value >= 0,
 				'non-zero-int' => is_int($value) && $value !== 0,
+				'decimal-int-string' => is_scalar($value) && (string) (int) $value === $value,
+				'non-decimal-int-string' => !is_scalar($value) || (string) (int) $value !== $value,
 				'class-string' => is_string($value) && class_exists($value),
 				'interface-string' => is_string($value) && interface_exists($value),
 				'trait-string' => is_string($value) && trait_exists($value),
@@ -155,6 +157,12 @@ class Runtime
 				} else if (array_key_exists($key, $value) && !self::checkTypeNode($arrayShapeItem->valueType, $filenameCallback, $value[$key])) {
 					return false;
 				}
+
+				unset($value[$key]);
+			}
+
+			if ($typeNode->sealed && $value !== []) {
+				return false;
 			}
 
 			return true;

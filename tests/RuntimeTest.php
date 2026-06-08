@@ -73,6 +73,20 @@ class RuntimeTest
 		assert(TypeValidator::isType(1, 'non-zero-int'));
 		assert(TypeValidator::isType(-1, 'non-zero-int'));
 		assert(!TypeValidator::isType(0, 'non-zero-int'));
+		assert(TypeValidator::isType('0', 'decimal-int-string'));
+		assert(TypeValidator::isType('123', 'decimal-int-string'));
+		assert(TypeValidator::isType('-1', 'decimal-int-string'));
+		assert(!TypeValidator::isType('0', 'non-decimal-int-string'));
+		assert(!TypeValidator::isType('123', 'non-decimal-int-string'));
+		assert(!TypeValidator::isType('-1', 'non-decimal-int-string'));
+		assert(!TypeValidator::isType('+1', 'decimal-int-string'));
+		assert(!TypeValidator::isType('00', 'decimal-int-string'));
+		assert(!TypeValidator::isType('1.2', 'decimal-int-string'));
+		assert(!TypeValidator::isType('foo', 'decimal-int-string'));
+		assert(TypeValidator::isType('+1', 'non-decimal-int-string'));
+		assert(TypeValidator::isType('00', 'non-decimal-int-string'));
+		assert(TypeValidator::isType('1.2', 'non-decimal-int-string'));
+		assert(TypeValidator::isType('foo', 'non-decimal-int-string'));
 
 		// string / non-empty-string / non-empty-lowercase-string / non-empty-uppercase-string / truthy-string' / non-falsy-string / lowercase-string / uppercase-string / numeric-string / __stringandstringable
 		assert(TypeValidator::isType('A', 'string'));
@@ -261,6 +275,10 @@ class RuntimeTest
 		assert(!TypeValidator::isType(['foo' => 1], 'array{foo: int, bar: string}'));
 		assert(TypeValidator::isType(['foo' => 1], 'array{foo: int, bar?: string}'));
 		assert(!TypeValidator::isType(['foo' => '1'], 'array{foo: int}'));
+
+		// Sealed
+		assert(TypeValidator::isType(['foo' => 1, 'bar' => 2], 'array{foo: int, ...}'));
+		assert(!TypeValidator::isType(['foo' => 1, 'bar' => 2], 'array{foo: int}'));
 
 		// Generic
 		assert(TypeValidator::isType([1, 2], 'array<int>'));
