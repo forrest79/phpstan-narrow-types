@@ -7,7 +7,7 @@ use Closure;
 use Generator;
 use Iterator;
 use IteratorAggregate;
-use _PHPStan_2874a496b\Nette\Utils\Strings;
+use _PHPStan_d6adcb4ac\Nette\Utils\Strings;
 use PhpParser\Node\Name;
 use PHPStan\Analyser\ConstantResolver;
 use PHPStan\Analyser\NameScope;
@@ -41,6 +41,7 @@ use PHPStan\PhpDocParser\Ast\Type\OffsetAccessTypeNode;
 use PHPStan\PhpDocParser\Ast\Type\ThisTypeNode;
 use PHPStan\PhpDocParser\Ast\Type\TypeNode;
 use PHPStan\PhpDocParser\Ast\Type\UnionTypeNode;
+use PHPStan\Reflection\Assertions;
 use PHPStan\Reflection\Callables\SimpleImpurePoint;
 use PHPStan\Reflection\InitializerExprContext;
 use PHPStan\Reflection\InitializerExprTypeResolver;
@@ -61,6 +62,7 @@ use PHPStan\Type\Accessory\NonEmptyArrayType;
 use PHPStan\Type\ArrayType;
 use PHPStan\Type\BenevolentUnionType;
 use PHPStan\Type\BooleanType;
+use PHPStan\Type\CallableAssertionsHelper;
 use PHPStan\Type\CallableType;
 use PHPStan\Type\ClassConstantAccessType;
 use PHPStan\Type\ClassStringType;
@@ -90,6 +92,7 @@ use PHPStan\Type\IntegerType;
 use PHPStan\Type\IntersectionType;
 use PHPStan\Type\IterableType;
 use PHPStan\Type\KeyOfType;
+use PHPStan\Type\LateResolvableArrayShapeType;
 use PHPStan\Type\MixedType;
 use PHPStan\Type\NewObjectType;
 use PHPStan\Type\NonAcceptingNeverType;
@@ -324,6 +327,10 @@ final class TypeNodeResolver
                 return new CallableType(\null, \null, \true, \null, \null, [], TrinaryLogic::createYes());
             case 'pure-closure':
                 return ClosureType::createPure();
+            case 'static-closure':
+                return new ClosureType(\null, \null, \true, \null, \null, \null, [], [], \null, [], [], \null, \null, \null, TrinaryLogic::createYes());
+            case 'static-pure-closure':
+                return new ClosureType(\null, \null, \true, \null, \null, \null, [], [], [], [], [], \null, \null, \null, TrinaryLogic::createYes());
             case 'resource':
                 $type = $this->tryResolvePseudoTypeClassType($typeNode, $nameScope);
                 if ($type !== null) {
@@ -786,17 +793,22 @@ final class TypeNodeResolver
             }
             return new NativeParameterReflection($parameterName, $parameterNode->isOptional || $parameterNode->isVariadic, $this->resolve($parameterNode->type, $nameScope), $parameterNode->isReference ? PassedByReference::createCreatesNewVariable() : PassedByReference::createNo(), $parameterNode->isVariadic, null);
         }, $typeNode->parameters));
-        $returnType = $this->resolve($typeNode->returnType, $nameScope);
+        $assertions = $this->resolveCallableReturnTypeAssertions($typeNode, $nameScope, $parameters);
+        if ($assertions !== null) {
+            $returnType = new BooleanType();
+        } else {
+            $returnType = $this->resolve($typeNode->returnType, $nameScope);
+        }
         if ($mainType instanceof CallableType) {
             $pure = $mainType->isPure();
             if ($pure->yes() && $returnType->isVoid()->yes()) {
                 return new ErrorType();
             }
-            return new CallableType($parameters, $returnType, $isVariadic, $templateTypeMap, \null, $templateTags, $pure);
+            return new CallableType($parameters, $returnType, $isVariadic, $templateTypeMap, \null, $templateTags, $pure, $assertions);
         } elseif ($mainType instanceof ObjectType && $mainType->getClassName() === Closure::class) {
-            return new ClosureType($parameters, $returnType, $isVariadic, $templateTypeMap, \null, \null, $templateTags, [], [new SimpleImpurePoint('functionCall', 'call to a Closure', \false)]);
+            return new ClosureType($parameters, $returnType, $isVariadic, $templateTypeMap, \null, \null, $templateTags, [], [new SimpleImpurePoint('functionCall', 'call to a Closure', \false)], [], [], \null, \null, $assertions);
         } elseif ($mainType instanceof ClosureType) {
-            $closure = new ClosureType($parameters, $returnType, $isVariadic, $templateTypeMap, \null, \null, $templateTags, [], $mainType->getImpurePoints(), $mainType->getInvalidateExpressions(), $mainType->getUsedVariables(), $mainType->acceptsNamedArguments(), $mainType->mustUseReturnValue());
+            $closure = new ClosureType($parameters, $returnType, $isVariadic, $templateTypeMap, \null, \null, $templateTags, [], $mainType->getImpurePoints(), $mainType->getInvalidateExpressions(), $mainType->getUsedVariables(), $mainType->acceptsNamedArguments(), $mainType->mustUseReturnValue(), $assertions, $mainType->isStaticClosure());
             if ($closure->isPure()->yes() && $returnType->isVoid()->yes()) {
                 return new ErrorType();
             }
@@ -804,74 +816,51 @@ final class TypeNodeResolver
         }
         return new ErrorType();
     }
+    /**
+     * Interprets a conditional return type referencing the callable's own parameter,
+     * like `callable(mixed $value): ($value is int ? true : false)`, as a type predicate.
+     *
+     * @param list<NativeParameterReflection> $parameters
+     */
+    private function resolveCallableReturnTypeAssertions(CallableTypeNode $typeNode, NameScope $nameScope, array $parameters): ?Assertions
+    {
+        $returnTypeNode = $typeNode->returnType;
+        if (!$returnTypeNode instanceof ConditionalTypeForParameterNode) {
+            return null;
+        }
+        foreach ($parameters as $parameter) {
+            if ('$' . $parameter->getName() !== $returnTypeNode->parameterName) {
+                continue;
+            }
+            return CallableAssertionsHelper::createAssertionsFromConditional($returnTypeNode->parameterName, $this->resolve($returnTypeNode->targetType, $nameScope), $returnTypeNode->negated, $this->resolve($returnTypeNode->if, $nameScope), $this->resolve($returnTypeNode->else, $nameScope));
+        }
+        return null;
+    }
     private function resolveArrayShapeNode(ArrayShapeNode $typeNode, NameScope $nameScope): Type
     {
-        $builder = ConstantArrayTypeBuilder::createEmpty();
-        $builder->disableArrayDegradation();
-        $explicitKeyValues = [];
+        $items = [];
         foreach ($typeNode->items as $itemNode) {
-            if ($itemNode->valueType instanceof CallableTypeNode) {
-                $builder->disableClosureDegradation();
-            }
-            $offsetType = $this->resolveArrayShapeOffsetType($itemNode, $nameScope);
-            if ($offsetType instanceof ConstantIntegerType || $offsetType instanceof ConstantStringType) {
-                $explicitKeyValues[] = $offsetType->getValue();
-            }
-            $builder->setOffsetValueType($offsetType, $this->resolve($itemNode->valueType, $nameScope), $itemNode->optional);
+            $items[] = [$this->resolveArrayShapeOffsetType($itemNode, $nameScope), $this->resolve($itemNode->valueType, $nameScope), $itemNode->optional];
         }
-        $isList = in_array($typeNode->kind, [ArrayShapeNode::KIND_LIST, ArrayShapeNode::KIND_NON_EMPTY_LIST], \true);
+        $unsealed = null;
         if (!$typeNode->sealed) {
-            if ($typeNode->unsealedType === null) {
-                if ($isList) {
-                    $unsealedKeyType = IntegerRangeType::createAllGreaterThanOrEqualTo(0);
-                } else {
-                    $unsealedKeyType = (new BenevolentUnionType([new IntegerType(), new StringType()]))->toArrayKey();
-                }
-                $builder->makeUnsealed($unsealedKeyType, new MixedType());
-            } else {
-                if ($typeNode->unsealedType->keyType === null) {
-                    if ($isList) {
-                        $unsealedKeyType = IntegerRangeType::createAllGreaterThanOrEqualTo(0);
-                    } else {
-                        $unsealedKeyType = (new BenevolentUnionType([new IntegerType(), new StringType()]))->toArrayKey();
-                    }
-                } else {
-                    $unsealedKeyType = $this->transformUnsafeArrayKey($this->resolve($typeNode->unsealedType->keyType, $nameScope));
-                }
-                $unsealedKeyFiniteTypes = $unsealedKeyType->getFiniteTypes();
-                $unsealedValueType = $this->resolve($typeNode->unsealedType->valueType, $nameScope);
-                if (count($unsealedKeyFiniteTypes) > 0) {
-                    foreach ($unsealedKeyFiniteTypes as $unsealedKeyFiniteType) {
-                        // Explicit keys own their slot — the unsealed extras
-                        // describe entries at keys NOT in the explicit set.
-                        if (($unsealedKeyFiniteType instanceof ConstantIntegerType || $unsealedKeyFiniteType instanceof ConstantStringType) && in_array($unsealedKeyFiniteType->getValue(), $explicitKeyValues, \true)) {
-                            continue;
-                        }
-                        $builder->setOffsetValueType($unsealedKeyFiniteType, $unsealedValueType, \true);
-                    }
-                } else {
-                    $builder->makeUnsealed($unsealedKeyType, $unsealedValueType);
-                }
-            }
+            // A key type that is not written down is derived from the shape kind
+            // when the shape gets built, so that it can be printed back as `...`.
+            $unsealedKeyType = $typeNode->unsealedType === null || $typeNode->unsealedType->keyType === null ? null : $this->transformUnsafeArrayKey($this->resolve($typeNode->unsealedType->keyType, $nameScope));
+            $unsealedValueType = $typeNode->unsealedType === null ? new MixedType() : $this->resolve($typeNode->unsealedType->valueType, $nameScope);
+            $unsealed = [$unsealedKeyType, $unsealedValueType];
         }
-        $arrayType = $builder->getArray();
-        $accessories = [];
-        if ($isList) {
-            $accessories[] = new AccessoryArrayListType();
-        }
-        if (in_array($typeNode->kind, [ArrayShapeNode::KIND_NON_EMPTY_ARRAY, ArrayShapeNode::KIND_NON_EMPTY_LIST], \true)) {
-            $accessories[] = new NonEmptyArrayType();
-        }
-        if (count($accessories) > 0) {
-            return TypeCombinator::intersect($arrayType, ...$accessories);
-        }
-        return $arrayType;
+        return LateResolvableArrayShapeType::create($items, $unsealed, $typeNode->kind);
     }
     private function resolveArrayShapeOffsetType(ArrayShapeItemNode $itemNode, NameScope $nameScope): ?Type
     {
         if ($itemNode->keyName instanceof ConstExprIntegerNode) {
             return new ConstantIntegerType((int) $itemNode->keyName->value);
         } elseif ($itemNode->keyName instanceof IdentifierTypeNode) {
+            $templateType = $nameScope->resolveTemplateTypeName($itemNode->keyName->name);
+            if ($templateType !== null) {
+                return $templateType;
+            }
             return new ConstantStringType($itemNode->keyName->name);
         } elseif ($itemNode->keyName instanceof ConstExprStringNode) {
             return new ConstantStringType($itemNode->keyName->value);
@@ -913,6 +902,12 @@ final class TypeNodeResolver
                 $isStatic = \false;
             }
             $constantName = $constExpr->name;
+            if (strtolower($constantName) === 'class') {
+                if ($isStatic) {
+                    return new GenericClassStringType(new StaticType($classReflection));
+                }
+                return new ConstantStringType($classReflection->getName(), \true);
+            }
             if (!$classReflection->hasConstant($constantName)) {
                 return new ErrorType();
             }
@@ -995,6 +990,12 @@ final class TypeNodeResolver
                 $isStatic = \false;
             }
             $constantName = $constExpr->name;
+            if (strtolower($constantName) === 'class') {
+                if ($isStatic) {
+                    return new GenericClassStringType(new StaticType($classReflection));
+                }
+                return new ConstantStringType($classReflection->getName(), \true);
+            }
             if (Strings::contains($constantName, '*')) {
                 // convert * into .*? and escape everything else so the constants can be matched against the pattern
                 $pattern = '{^' . str_replace('\*', '.*?', preg_quote($constantName)) . '$}D';
